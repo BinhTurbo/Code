@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { ToastService } from '../../../core/toast.service';
 
 @Component({
   standalone: true,
@@ -14,6 +15,7 @@ export class LoginComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private toast = inject(ToastService);
 
   loading = signal(false);
   error = signal<string | null>(null);
@@ -31,10 +33,13 @@ export class LoginComponent {
     this.auth.login({ username: username!, password: password! }).subscribe({
       next: (res) => {
         this.auth.applyLogin(res);
+        this.toast.success('Đăng nhập thành công!');
         this.router.navigateByUrl('/'); // ➜ Dashboard
       },
       error: (err) => {
-        this.error.set(err?.error?.message || 'Sai tài khoản hoặc mật khẩu');
+        const errorMsg = err?.error?.message || 'Sai tài khoản hoặc mật khẩu';
+        this.error.set(errorMsg);
+        this.toast.error(errorMsg);
         this.loading.set(false);
       },
     });

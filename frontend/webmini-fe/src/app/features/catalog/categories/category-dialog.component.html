@@ -1,0 +1,151 @@
+<div class="dialog-container">
+  <!-- Header -->
+  <div class="dialog-header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+        />
+      </svg>
+    </div>
+    <div class="header-content">
+      <h2 class="dialog-title">
+        {{ data ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới' }}
+      </h2>
+      <p class="dialog-subtitle">
+        {{
+          data
+            ? 'Cập nhật thông tin danh mục'
+            : 'Nhập thông tin danh mục mới'
+        }}
+      </p>
+    </div>
+    <button class="close-btn" (click)="ref.close()" type="button">
+      <svg viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fill-rule="evenodd"
+          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+          clip-rule="evenodd"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Form -->
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="dialog-form">
+    <div class="form-group">
+      <label class="form-label">
+        <span class="label-text">Tên danh mục</span>
+        <span class="label-required">*</span>
+      </label>
+      <div class="input-wrapper">
+        <div class="input-icon">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </div>
+        <input
+          type="text"
+          class="form-input"
+          placeholder="Nhập tên danh mục (VD: Điện thoại)"
+          formControlName="name"
+          maxlength="150"
+          [class.input-error]="
+                form.get('name')?.invalid && form.get('name')?.touched
+              "
+        />
+      </div>
+      <div class="char-counter">
+        {{ form.get('name')?.value?.length || 0 }}/150 ký tự
+      </div>
+      <div
+        class="error-message"
+        *ngIf="form.get('name')?.invalid && form.get('name')?.touched"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <span *ngIf="form.get('name')?.hasError('required')">
+              Tên danh mục là bắt buộc
+            </span>
+        <span *ngIf="form.get('name')?.hasError('minlength')">
+              Tên danh mục phải có ít nhất 2 ký tự
+            </span>
+        <span *ngIf="form.get('name')?.hasError('maxlength')">
+              Tên danh mục không được vượt quá 150 ký tự
+            </span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">
+        <span class="label-text">Trạng thái</span>
+        <span class="label-required">*</span>
+      </label>
+      <div class="select-wrapper">
+        <div class="select-icon">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </div>
+        <select class="form-select" formControlName="status">
+          <option value="ACTIVE">Hoạt động</option>
+          <option value="INACTIVE">Không hoạt động</option>
+        </select>
+        <div class="select-arrow">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="dialog-actions">
+      <button type="button" class="btn-cancel" (click)="ref.close()">
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path
+            fill-rule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        Hủy
+      </button>
+      <button
+        type="submit"
+        class="btn-submit"
+        [disabled]="form.invalid"
+        [class.btn-disabled]="form.invalid"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor">
+          <path
+            fill-rule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        {{ data ? 'Cập nhật' : 'Tạo mới' }}
+      </button>
+    </div>
+  </form>
+</div>

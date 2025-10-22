@@ -9,6 +9,7 @@ import {
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { ToastService } from '../../../core/toast.service';
 
 function matchPasswordValidator(
   group: AbstractControl
@@ -73,12 +74,13 @@ function fullNameValidator(control: AbstractControl): ValidationErrors | null {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: 'register.component.html',
-  styleUrls: ['register.component.scss']
+  styleUrls: ['register.component.scss'],
 })
 export class RegisterComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private toast = inject(ToastService);
 
   loading = signal(false);
   error = signal<string | null>(null);
@@ -146,13 +148,14 @@ export class RegisterComponent {
 
     this.auth.register({ fullName, username, password }).subscribe({
       next: (res) => {
-        // BE trả TokenResponse → auto login
-        this.auth.applyLogin(res);
-        this.router.navigateByUrl('/'); // vào Dashboard
+        this.toast.success('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
+        // Chuyển về trang đăng nhập
+        this.router.navigateByUrl('/login');
       },
       error: (err) => {
         const msg = err?.error?.message || 'Đăng ký thất bại';
         this.error.set(msg);
+        this.toast.error(msg);
         this.loading.set(false);
       },
     });
