@@ -4,17 +4,15 @@ import com.webmini.miniweb.catalog.category.dto.*;
 import com.webmini.miniweb.catalog.category.entity.Category;
 import com.webmini.miniweb.catalog.category.mapper.CategoryMapper;
 import com.webmini.miniweb.catalog.category.repo.CategoryRepository;
-import com.webmini.miniweb.catalog.category.specs.CategorySpecs;
-import com.webmini.miniweb.catalog.product.entity.Product;
 import com.webmini.miniweb.catalog.product.repo.ProductRepository;
 import com.webmini.miniweb.common.*;
+import com.webmini.miniweb.messaging.service.CategoryEventPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,8 +20,10 @@ public class CategoryService {
     private final CategoryRepository repo;
     private final CategoryMapper mapper;
     private final ProductRepository productRepo;
+    private final CategoryEventPublisher eventPublisher;
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryDtos.CategoryResponse create(CategoryDtos.CategoryCreateRequest req) {
         // Validate and trim name
         String trimmedName = validateAndTrimName(req.name());
@@ -41,10 +41,16 @@ public class CategoryService {
         e.setName(trimmedName);
         e.setUpdatedAt(null);
         
-        return mapper.toDto(repo.save(e));
+        Category saved = repo.save(e);
+        
+        // 🔥 Gửi message vào RabbitMQ: Category được tạo mới
+        eventPublisher.publishCategoryCreated(saved.getId(), saved.getName(), saved.getStatus().name());
+        
+        return mapper.toDto(saved);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "#id")
     public CategoryDtos.CategoryResponse get(Long id) {
         Category e = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
@@ -52,6 +58,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryDtos.CategoryResponse update(Long id, CategoryDtos.CategoryUpdateRequest req) {
         // Find existing category
         Category e = repo.findById(id)
@@ -77,23 +84,31 @@ public class CategoryService {
         
         Category saved = repo.save(e);
 
-        // Cascade INACTIVE status to products if category became INACTIVE
-        if (oldStatus == Category.CategoryStatus.ACTIVE &&
-                saved.getStatus() == Category.CategoryStatus.INACTIVE) {
-            cascadeInactiveToProducts(id);
+        // 🔥 Nếu status thay đổi, gửi message vào RabbitMQ
+        if (oldStatus != saved.getStatus()) {
+            eventPublisher.publishCategoryStatusChanged(
+                saved.getId(),
+                saved.getName(),
+                oldStatus.name(),
+                saved.getStatus().name()
+            );
+            
+            // ⚠️ QUAN TRỌNG: Không gọi cascadeInactiveToProducts() ở đây nữa
+            // Để RabbitMQ Listener xử lý (bất đồng bộ)
         }
 
         return mapper.toDto(saved);
     }
 
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public void delete(Long id) {
         if (!repo.existsById(id)) {
             throw new NotFoundException("Không tìm thấy danh mục với ID: " + id);
         }
         
         // Check if any products reference this category
-        if (productRepo.existsByCategory_Id(id)) {
+        if (productRepo.existsByCategoryId(id)) {
             throw new ConflictException(
                 "Không thể xóa danh mục vì có sản phẩm đang tham chiếu. " +
                 "Vui lòng di chuyển hoặc xóa các sản phẩm đó trước."
@@ -104,15 +119,15 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
+    // ⚠️ Không cache Page object vì không serialize/deserialize tốt với Redis
+    // Chỉ cache get by ID là đủ
     public Page<CategoryDtos.CategoryResponse> search(String q, String status, Pageable pageable) {
         // Validate status if provided
         if (status != null && !status.isBlank()) {
             validateStatus(status);
         }
         
-        Specification<Category> spec = Specification.where(CategorySpecs.nameContains(q))
-                .and(CategorySpecs.statusEquals(status));
-        return repo.findAll(spec, pageable).map(mapper::toDto);
+        return repo.search(q, status, pageable).map(mapper::toDto);
     }
 
     /**
@@ -146,22 +161,6 @@ public class CategoryService {
         
         if (!status.equals("ACTIVE") && !status.equals("INACTIVE")) {
             throw new ValidationException("Trạng thái phải là ACTIVE hoặc INACTIVE");
-        }
-    }
-
-    /**
-     * Set all products of a category to INACTIVE when category becomes INACTIVE
-     */
-    private void cascadeInactiveToProducts(Long categoryId) {
-        List<Product> products = productRepo.findAllByCategory_Id(categoryId);
-        products.forEach(product -> {
-            if (product.getStatus() == Product.ProductStatus.ACTIVE) {
-                product.setStatus(Product.ProductStatus.INACTIVE);
-                product.setUpdatedAt(java.time.LocalDateTime.now());
-            }
-        });
-        if (!products.isEmpty()) {
-            productRepo.saveAll(products);
         }
     }
 }

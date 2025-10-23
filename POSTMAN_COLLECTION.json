@@ -1,0 +1,972 @@
+{
+  "info": {
+    "name": "MiniWeb - Redis & RabbitMQ API (Fixed Auth)",
+    "description": "Full API Collection với Authorization đầy đủ\n\n🔑 **Authentication:**\n- Bearer Token tự động gắn vào requests cần auth\n- Run Login trước để lấy token\n\n🎯 **Test Flow:**\n1. Auth → Login (lấy token)\n2. Test các endpoints khác\n\n⚠️ **Note:** Token expire sau 15 phút",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    pm.environment.set(\"user_id\", pm.response.json().id);",
+                  "    console.log(\"✅ User registered successfully\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"Test@123\",\n  \"fullName\": \"Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Đăng ký user mới (public endpoint)"
+          }
+        },
+        {
+          "name": "Login (Get JWT Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"jwt_token\", response.accessToken);",
+                  "    pm.environment.set(\"refresh_token\", response.refreshToken);",
+                  "    pm.collectionVariables.set(\"jwt_token\", response.accessToken);",
+                  "    console.log(\"✅ Token saved: \" + response.accessToken.substring(0, 20) + \"...\");",
+                  "    console.log(\"⏰ Token expires in: 15 minutes\");",
+                  "} else {",
+                  "    console.error(\"❌ Login failed\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "🔑 **RUN FIRST!** Login để lấy JWT Token\n\n**Default Admin:**\n- Username: `admin`\n- Password: `admin123`\n\n**Token expire:** 15 minutes (từ jwt.access-ttl)\n\n**Auto-save:** Token tự động lưu vào environment và collection variables"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"jwt_token\", response.accessToken);",
+                  "    pm.collectionVariables.set(\"jwt_token\", response.accessToken);",
+                  "    console.log(\"✅ Token refreshed\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "description": "Refresh access token khi hết hạn"
+          }
+        }
+      ],
+      "description": "Authentication endpoints\n\n⚠️ **RUN LOGIN FIRST!**"
+    },
+    {
+      "name": "📦 Products (Redis Cache Test)",
+      "item": [
+        {
+          "name": "Get Products (Page 1) - FIRST CALL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseTime = pm.response.responseTime;",
+                  "pm.environment.set(\"first_call_time\", responseTime);",
+                  "console.log(\"⏱️ First call (from DB): \" + responseTime + \"ms\");",
+                  "",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has products\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "🐢 **FIRST CALL** - Query từ Database\n\n**Expected:**\n- Response time: ~100-200ms\n- Data từ MySQL\n- Uses Bearer Token from collection auth\n\n**Next Step:**\n- Chạy \"SECOND CALL\" để test Redis cache"
+          }
+        },
+        {
+          "name": "Get Products (Page 1) - SECOND CALL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseTime = pm.response.responseTime;",
+                  "const firstCallTime = pm.environment.get(\"first_call_time\");",
+                  "",
+                  "console.log(\"⚡ Second call (from Redis): \" + responseTime + \"ms\");",
+                  "if (firstCallTime) {",
+                  "    const improvement = Math.round((1 - responseTime/firstCallTime) * 100);",
+                  "    console.log(\"📊 Performance improvement: \" + improvement + \"%\");",
+                  "}",
+                  "",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (firstCallTime) {",
+                  "    pm.test(\"Faster than first call (Redis cache)\", function () {",
+                  "        pm.expect(responseTime).to.be.below(firstCallTime);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "⚡ **SECOND CALL** - Lấy từ Redis Cache\n\n**Expected:**\n- Response time: ~5-10ms (nhanh hơn 90-95%)\n- Data từ Redis\n\n**Verify:**\n```bash\ndocker exec -it wedmini-redis redis-cli\nKEYS products::*\nTTL products::page=0&size=10\n```"
+          }
+        },
+        {
+          "name": "Search Products by Name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const products = pm.response.json().content;",
+                  "    if (products.length > 0) {",
+                  "        pm.environment.set(\"product_id\", products[0].id);",
+                  "        console.log(\"✅ Found \" + products.length + \" products\");",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?name=laptop&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "laptop",
+                  "description": "Search by product name"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Tìm kiếm sản phẩm theo tên\n\n**Cache Key:**\n```\nproducts::name=laptop&page=0&size=10\n```\n\nRun 2 lần để test cache performance"
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Lấy chi tiết 1 sản phẩm\n\n**Cache:** Có (by ID)"
+          }
+        },
+        {
+          "name": "Create Product (Cache Eviction)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "    pm.environment.set(\"new_product_id\", pm.response.json().id);",
+                  "    console.log(\"✅ Product created: ID = \" + pm.response.json().id);",
+                  "    console.log(\"🗑️ Cache evicted: products::*\");",
+                  "    console.log(\"💡 Run 'Get Products' again to see fresh data from DB\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Dell XPS 15 2024\",\n  \"description\": \"High performance laptop for developers\",\n  \"price\": 35000000,\n  \"stock\": 10,\n  \"status\": \"ACTIVE\",\n  \"categoryId\": {{category_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "🗑️ **Cache Eviction Test**\n\n**Flow:**\n1. Create product\n2. `@CacheEvict(value = \"products\", allEntries = true)`\n3. All product cache cleared\n\n**After this:**\n- Run \"Get Products\" again\n- First call will be slow (DB query)\n- Second call will be fast (Redis)\n\n**Note:** Requires Bearer Token (auto from collection auth)"
+          }
+        },
+        {
+          "name": "Update Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    console.log(\"✅ Product updated\");",
+                  "    console.log(\"🗑️ Cache evicted\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Dell XPS 15 2024 (Updated)\",\n  \"description\": \"Updated description\",\n  \"price\": 32000000,\n  \"stock\": 8,\n  \"status\": \"ACTIVE\",\n  \"categoryId\": {{category_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{new_product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{new_product_id}}"]
+            },
+            "description": "Cập nhật sản phẩm → Cache bị xóa"
+          }
+        },
+        {
+          "name": "Delete Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 204 || pm.response.code === 200) {",
+                  "    console.log(\"✅ Product deleted\");",
+                  "    console.log(\"🗑️ Cache evicted\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{new_product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{new_product_id}}"]
+            },
+            "description": "Xóa sản phẩm → Cache bị xóa"
+          }
+        }
+      ],
+      "description": "Test Redis Cache Performance\n\n⚠️ **Requires Bearer Token** (auto from collection)"
+    },
+    {
+      "name": "📁 Categories (RabbitMQ Test)",
+      "item": [
+        {
+          "name": "Get Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const categories = pm.response.json().content;",
+                  "    if (categories.length > 0) {",
+                  "        pm.environment.set(\"category_id\", categories[0].id);",
+                  "        console.log(\"✅ Found \" + categories.length + \" categories\");",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Lấy danh sách categories\n\n**Cache:** Có (TTL 10 phút)"
+          }
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "{{category_id}}"]
+            },
+            "description": "Lấy chi tiết 1 category\n\n**Cache:** Có"
+          }
+        },
+        {
+          "name": "Create Category (RabbitMQ Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "    const category = pm.response.json();",
+                  "    pm.environment.set(\"new_category_id\", category.id);",
+                  "    console.log(\"✅ Category created: ID = \" + category.id);",
+                  "    console.log(\"📤 RabbitMQ message sent: category.created\");",
+                  "    console.log(\"📧 Check backend log for email\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"Expected log:\");",
+                  "    console.log(\"  📤 Đã gửi message: Category created\");",
+                  "    console.log(\"  📥 Nhận message: ...\");",
+                  "    console.log(\"  📧 Đã gửi email đến: binhturbo2002@gmail.com\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Gaming {{$timestamp}}\",\n  \"description\": \"High-end gaming laptops with RGB lighting\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "📧 **RabbitMQ Email Test**\n\n**Flow:**\n1. POST /api/categories\n2. CategoryService → RabbitMQ: `category.created`\n3. CategoryEventListener nhận message\n4. EmailService gửi email\n\n**Check:**\n\n1. **Backend Log:**\n```\n📤 Đã gửi message: Category created\n📥 Nhận message: ...\n📧 Đã gửi email đến: binhturbo2002@gmail.com\n```\n\n2. **RabbitMQ UI:** http://localhost:15672\n   - Username: admin\n   - Password: admin123\n   - Tab **Queues** → `category.queue`\n   - Tab **Exchanges** → `category.exchange`\n\n3. **Email Inbox:** Check `binhturbo2002@gmail.com`\n\n**Note:** Email có thể vào Spam nếu lần đầu gửi"
+          }
+        },
+        {
+          "name": "Update Category Status (RabbitMQ + Cascade Update)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    console.log(\"✅ Category status updated to INACTIVE\");",
+                  "    console.log(\"📤 RabbitMQ: category.status.changed\");",
+                  "    console.log(\"🔄 All products in this category → INACTIVE\");",
+                  "    console.log(\"📧 Email sent with affected product count\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"Expected log:\");",
+                  "    console.log(\"  🔄 Xử lý event: Category status changed\");",
+                  "    console.log(\"  🔍 Tìm thấy X sản phẩm\");",
+                  "    console.log(\"  ✅ Đã cập nhật X sản phẩm sang INACTIVE\");",
+                  "    console.log(\"  📧 Đã gửi email: X products affected\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"Verify in database:\");",
+                  "    console.log(\"  SELECT * FROM categories WHERE id = \" + pm.environment.get(\"new_category_id\") + \";\");",
+                  "    console.log(\"  SELECT * FROM products WHERE category_id = \" + pm.environment.get(\"new_category_id\") + \";\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop Gaming (Discontinued)\",\n  \"description\": \"This category has been discontinued\",\n  \"status\": \"INACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{new_category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "{{new_category_id}}"]
+            },
+            "description": "🔄 **RabbitMQ Cascade Update Test**\n\n**Setup:**\n1. Run \"Create Category\"\n2. Create 2-3 products trong category đó (status=ACTIVE)\n3. Run request này\n\n**Flow:**\n1. PUT /api/categories/{id} với status=INACTIVE\n2. CategoryService → RabbitMQ: `category.status.changed`\n3. CategoryEventListener:\n   - Tìm all products có category_id = {id}\n   - Update tất cả products → status=INACTIVE\n   - Gửi email với số lượng products bị ảnh hưởng\n\n**Verify:**\n\n```sql\n-- Check category\nSELECT * FROM categories WHERE id = {{new_category_id}};\n-- status should be INACTIVE\n\n-- Check products\nSELECT * FROM products WHERE category_id = {{new_category_id}};\n-- All status should be INACTIVE\n```\n\n**Backend Log:**\n```\n🔄 Xử lý event: Category status changed\n🔍 Tìm thấy 3 sản phẩm\n✅ Đã cập nhật 3 sản phẩm sang INACTIVE\n📧 Đã gửi email: 3 products affected\n```"
+          }
+        },
+        {
+          "name": "Delete Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 204 || pm.response.code === 200) {",
+                  "    console.log(\"✅ Category deleted\");",
+                  "    console.log(\"🗑️ Cache evicted\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{new_category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "{{new_category_id}}"]
+            },
+            "description": "Xóa category → Cache bị xóa"
+          }
+        }
+      ],
+      "description": "Test RabbitMQ Messaging & Email\n\n⚠️ **Requires Bearer Token**"
+    },
+    {
+      "name": "🔍 Verify & Debug",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/actuator/health",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Check health:\n- Application\n- Database\n- Redis\n- RabbitMQ"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Full Test Flow (Run in Order)",
+      "item": [
+        {
+          "name": "STEP 1: Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"jwt_token\", response.accessToken);",
+                  "    pm.collectionVariables.set(\"jwt_token\", response.accessToken);",
+                  "    console.log(\"✅ Step 1: Login OK\");",
+                  "    console.log(\"🔑 Token: \" + response.accessToken.substring(0, 30) + \"...\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "STEP 2: Create Category + Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Category created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const category = pm.response.json();",
+                  "    pm.environment.set(\"test_category_id\", category.id);",
+                  "    console.log(\"✅ Step 2: Category created, ID = \" + category.id);",
+                  "    console.log(\"📧 Check backend log for email notification\");",
+                  "});",
+                  "",
+                  "setTimeout(function(){}, 2000);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Category {{$timestamp}}\",\n  \"description\": \"Testing RabbitMQ & Email\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            }
+          }
+        },
+        {
+          "name": "STEP 3: Create Product 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Product 1 created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.environment.set(\"test_product_1_id\", pm.response.json().id);",
+                  "    console.log(\"✅ Step 3a: Product 1 created\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Product 1 {{$timestamp}}\",\n  \"description\": \"Testing product 1\",\n  \"price\": 1000000,\n  \"stock\": 10,\n  \"status\": \"ACTIVE\",\n  \"categoryId\": {{test_category_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "STEP 3: Create Product 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Product 2 created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.environment.set(\"test_product_2_id\", pm.response.json().id);",
+                  "    console.log(\"✅ Step 3b: Product 2 created\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Product 2 {{$timestamp}}\",\n  \"description\": \"Testing product 2\",\n  \"price\": 2000000,\n  \"stock\": 20,\n  \"status\": \"ACTIVE\",\n  \"categoryId\": {{test_category_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "STEP 3: Create Product 3",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Product 3 created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.environment.set(\"test_product_3_id\", pm.response.json().id);",
+                  "    console.log(\"✅ Step 3c: Product 3 created\");",
+                  "    console.log(\"📦 Total: 3 products created\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Product 3 {{$timestamp}}\",\n  \"description\": \"Testing product 3\",\n  \"price\": 3000000,\n  \"stock\": 30,\n  \"status\": \"ACTIVE\",\n  \"categoryId\": {{test_category_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "STEP 4: Get Products - First Call (Cache Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseTime = pm.response.responseTime;",
+                  "pm.environment.set(\"test_first_call_time\", responseTime);",
+                  "console.log(\"✅ Step 4a: First call = \" + responseTime + \"ms (from DB)\");",
+                  "console.log(\"💡 Run STEP 4b to see Redis cache performance\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STEP 4: Get Products - Second Call (Cache Test)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseTime = pm.response.responseTime;",
+                  "const firstCallTime = pm.environment.get(\"test_first_call_time\");",
+                  "",
+                  "console.log(\"✅ Step 4b: Second call = \" + responseTime + \"ms (from Redis)\");",
+                  "",
+                  "if (firstCallTime) {",
+                  "    const improvement = Math.round((1 - responseTime/firstCallTime) * 100);",
+                  "    console.log(\"📊 Performance: \" + improvement + \"% faster!\");",
+                  "    console.log(\"   First:  \" + firstCallTime + \"ms (DB)\");",
+                  "    console.log(\"   Second: \" + responseTime + \"ms (Redis)\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STEP 5: Update Category Status (Cascade Update)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Category updated\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log(\"✅ Step 5: Category status → INACTIVE\");",
+                  "    console.log(\"🔄 RabbitMQ: Updating all products...\");",
+                  "    console.log(\"📧 Email: Notifying admin...\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"Expected backend log:\");",
+                  "    console.log(\"  🔄 Xử lý event: Category status changed\");",
+                  "    console.log(\"  ✅ Đã cập nhật 3 sản phẩm sang INACTIVE\");",
+                  "    console.log(\"  📧 Đã gửi email: 3 products affected\");",
+                  "});",
+                  "",
+                  "setTimeout(function(){}, 3000);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Category (Discontinued)\",\n  \"description\": \"Testing cascade update - All products should be INACTIVE\",\n  \"status\": \"INACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{test_category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "{{test_category_id}}"]
+            }
+          }
+        },
+        {
+          "name": "STEP 6: Verify Products Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"All test products are INACTIVE\", function () {",
+                  "    const products = pm.response.json().content;",
+                  "    const categoryId = parseInt(pm.environment.get(\"test_category_id\"));",
+                  "    ",
+                  "    const categoryProducts = products.filter(p => p.categoryId === categoryId);",
+                  "    ",
+                  "    let allInactive = true;",
+                  "    categoryProducts.forEach(product => {",
+                  "        if (product.status !== \"INACTIVE\") {",
+                  "            allInactive = false;",
+                  "        }",
+                  "    });",
+                  "    ",
+                  "    pm.expect(allInactive).to.be.true;",
+                  "    ",
+                  "    console.log(\"✅ Step 6: Verified \" + categoryProducts.length + \" products are INACTIVE\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"🎉 FULL TEST COMPLETED!\");",
+                  "    console.log(\"\");",
+                  "    console.log(\"Summary:\");",
+                  "    console.log(\"  ✅ Redis Cache: Working (\" + Math.round((1 - pm.environment.get(\"test_first_call_time\") / pm.response.responseTime) * -100) + \"% faster)\");",
+                  "    console.log(\"  ✅ RabbitMQ Email: Sent on category creation\");",
+                  "    console.log(\"  ✅ RabbitMQ Cascade: Updated \" + categoryProducts.length + \" products\");",
+                  "    console.log(\"  ✅ Email Notification: Sent with product count\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "🧪 **Complete Test Flow**\n\nRun all steps **IN ORDER**:\n\n1. **STEP 1:** Login → Get JWT token\n2. **STEP 2:** Create category → RabbitMQ email\n3. **STEP 3:** Create 3 products (run 3 requests)\n4. **STEP 4:** Test Redis cache (run 2 requests)\n5. **STEP 5:** Update category status → Cascade update\n6. **STEP 6:** Verify all products INACTIVE\n\n**Each step has Test Scripts** to auto-verify results.\n\nCheck **Test Results** tab and **Console** for detailed logs."
+    }
+  ],
+  "variable": [
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

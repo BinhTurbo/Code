@@ -6,11 +6,11 @@ import com.webmini.miniweb.catalog.product.dto.*;
 import com.webmini.miniweb.catalog.product.entity.Product;
 import com.webmini.miniweb.catalog.product.mapper.ProductMapper;
 import com.webmini.miniweb.catalog.product.repo.ProductRepository;
-import com.webmini.miniweb.catalog.product.specs.ProductSpecs;
 import com.webmini.miniweb.common.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +24,7 @@ public class ProductService {
     private final ProductMapper mapper;
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductDtos.ProductResponse create(ProductDtos.ProductCreateRequest req) {
         // Validate SKU
         String trimmedSku = validateAndTrimSku(req.sku());
@@ -68,6 +69,7 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "products", key = "#id")
     public ProductDtos.ProductResponse get(Long id) {
         Product e = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy sản phẩm với ID: " + id));
@@ -75,6 +77,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public ProductDtos.ProductResponse update(Long id, ProductDtos.ProductUpdateRequest req) {
         // Find existing product
         Product e = repo.findById(id)
@@ -117,6 +120,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(value = "products", allEntries = true)
     public void delete(Long id) {
         if (!repo.existsById(id)) {
             throw new NotFoundException("Không tìm thấy sản phẩm với ID: " + id);
@@ -125,6 +129,8 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    // ⚠️ Không cache Page object vì không serialize/deserialize tốt với Redis
+    // Chỉ cache get by ID là đủ
     public Page<ProductDtos.ProductResponse> search(String q, String sku, Long categoryId,
                                                     String status, Integer minStockLt, Pageable pageable) {
         // Validate status if provided
@@ -137,12 +143,7 @@ public class ProductService {
             throw new ValidationException("Giá trị tồn kho tối thiểu phải >= 0");
         }
         
-        Specification<Product> spec = Specification.where(ProductSpecs.qLike(q))
-                .and(ProductSpecs.skuEquals(sku))
-                .and(ProductSpecs.categoryIdEquals(categoryId))
-                .and(ProductSpecs.statusEquals(status))
-                .and(ProductSpecs.stockLt(minStockLt));
-        return repo.findAll(spec, pageable).map(mapper::toDto);
+        return repo.search(q, sku, categoryId, status, minStockLt, pageable).map(mapper::toDto);
     }
 
     /**

@@ -3,18 +3,20 @@ package com.webmini.miniweb.catalog.product.repo;
 import com.webmini.miniweb.catalog.product.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.*;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
-@Repository
-public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
+public interface ProductRepository {
+    Product save(Product product);
+    Optional<Product> findById(Long id);
     boolean existsBySkuIgnoreCase(String sku);
-    boolean existsByCategory_Id(Long categoryId);
-
-    List<Product> findAllByCategory_Id(Long categoryId);
-
-    @Query("SELECT p FROM Product p JOIN FETCH p.category ORDER BY p.id")
+    boolean existsByCategoryId(Long categoryId);
+    List<Product> findAllByCategoryId(Long categoryId);
     Page<Product> findAllWithCategory(Pageable pageable);
+    boolean existsById(Long id);
+    void deleteById(Long id);
+    Page<Product> search(String q, String sku, Long categoryId, String status, Integer minStockLt, Pageable pageable);
+    List<Product> findAll();
+    void saveAll(List<Product> products);
 }

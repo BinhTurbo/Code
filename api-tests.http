@@ -1,0 +1,308 @@
+### ===========================================
+### Redis & RabbitMQ Test APIs
+### VSCode Extension: REST Client
+### ===========================================
+
+@baseUrl = http://localhost:8081/api
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### ===========================================
+### 1. AUTH - Get Token
+### ===========================================
+
+### Login (Lấy token)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+# Copy accessToken và paste vào @token ở trên
+
+
+### ===========================================
+### 2. TEST REDIS CACHE - PRODUCT
+### ===========================================
+
+### 2.1. Search Products (Lần 1: Cache MISS - Query DB)
+# Expected: ~100ms, có log Hibernate query
+GET {{baseUrl}}/products?q=laptop&status=ACTIVE&page=0&size=10
+Content-Type: application/json
+
+### 2.2. Search Products (Lần 2: Cache HIT - From Redis)
+# Expected: ~5ms, KHÔNG có log Hibernate query
+GET {{baseUrl}}/products?q=laptop&status=ACTIVE&page=0&size=10
+Content-Type: application/json
+
+### 2.3. Get Product by ID (Cache)
+GET {{baseUrl}}/products/1
+Content-Type: application/json
+
+### 2.4. Create Product (Xóa cache)
+# Expected: Cache product bị xóa
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "LAPTOP-TEST-001",
+  "name": "Laptop Test Cache",
+  "categoryId": 1,
+  "price": 25000000,
+  "stock": 10,
+  "status": "ACTIVE"
+}
+
+### 2.5. Verify Cache Cleared (Query lại sẽ cache MISS)
+GET {{baseUrl}}/products?q=laptop&status=ACTIVE&page=0&size=10
+Content-Type: application/json
+
+
+### ===========================================
+### 3. TEST REDIS CACHE - CATEGORY
+### ===========================================
+
+### 3.1. Get Category by ID (Cache)
+GET {{baseUrl}}/categories/1
+Content-Type: application/json
+
+### 3.2. Search Categories (Cache)
+GET {{baseUrl}}/categories?q=&status=ACTIVE&page=0&size=10
+Content-Type: application/json
+
+
+### ===========================================
+### 4. TEST RABBITMQ - CREATE CATEGORY
+### ===========================================
+
+### 4.1. Create Category (Gửi message → Email)
+# Expected:
+# - Category created
+# - Message sent to RabbitMQ
+# - Email sent to admin@example.com
+# Backend log:
+#   📤 Đã gửi message: Category created
+#   📥 Nhận message: ...
+#   ✅ Đã gửi email đến: admin@example.com
+POST {{baseUrl}}/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Test Category - RabbitMQ",
+  "status": "ACTIVE"
+}
+
+
+### ===========================================
+### 5. TEST RABBITMQ - STATUS CHANGED
+### ===========================================
+
+### 5.0. Setup - Create Category for testing
+POST {{baseUrl}}/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Category Status Test",
+  "status": "ACTIVE"
+}
+
+# Copy ID từ response (ví dụ: id: 5)
+
+### 5.1. Create Products for Category ID=5
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "PROD-STATUS-001",
+  "name": "Product 1",
+  "categoryId": 5,
+  "price": 100000,
+  "stock": 10,
+  "status": "ACTIVE"
+}
+
+### 5.2. Create Product 2
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "PROD-STATUS-002",
+  "name": "Product 2",
+  "categoryId": 5,
+  "price": 200000,
+  "stock": 20,
+  "status": "ACTIVE"
+}
+
+### 5.3. Create Product 3
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "PROD-STATUS-003",
+  "name": "Product 3",
+  "categoryId": 5,
+  "price": 300000,
+  "stock": 30,
+  "status": "ACTIVE"
+}
+
+### 5.4. Update Category Status: ACTIVE → INACTIVE
+# Expected:
+# - Category status → INACTIVE
+# - Message sent to RabbitMQ
+# - ALL products of category → INACTIVE (async)
+# - Email sent with number of affected products
+# Backend log:
+#   📤 Đã gửi message: Category status changed
+#   📥 Nhận message: ...
+#   🔄 Xử lý event: Category status changed
+#   ✅ Đã cập nhật 3 sản phẩm sang INACTIVE
+#   ✅ Đã gửi email đến: admin@example.com
+PUT {{baseUrl}}/categories/5
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Category Status Test",
+  "status": "INACTIVE"
+}
+
+### 5.5. Verify Category Status
+GET {{baseUrl}}/categories/5
+Content-Type: application/json
+
+# Expected: status = "INACTIVE"
+
+### 5.6. Verify Products Status
+GET {{baseUrl}}/products?categoryId=5
+Content-Type: application/json
+
+# Expected: All products status = "INACTIVE"
+
+
+### ===========================================
+### 6. TEST CACHE EVICTION
+### ===========================================
+
+### 6.1. Update Category (Xóa cache)
+PUT {{baseUrl}}/categories/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Updated Category Name",
+  "status": "ACTIVE"
+}
+
+### 6.2. Verify Cache Cleared
+GET {{baseUrl}}/categories/1
+Content-Type: application/json
+
+# Lần này sẽ query DB (cache miss)
+
+
+### ===========================================
+### 7. PERFORMANCE TEST
+### ===========================================
+
+### 7.1. Search Products - 100 records (No Cache)
+# Tip: Xóa cache trước bằng Redis CLI:
+# docker exec -it wedmini-redis redis-cli FLUSHALL
+GET {{baseUrl}}/products?page=0&size=100
+Content-Type: application/json
+
+# Expected: ~150-200ms (query DB)
+
+### 7.2. Search Products - 100 records (With Cache)
+GET {{baseUrl}}/products?page=0&size=100
+Content-Type: application/json
+
+# Expected: ~5-10ms (from Redis)
+# Performance gain: ~95% faster!
+
+
+### ===========================================
+### 8. EDGE CASES
+### ===========================================
+
+### 8.1. Update Category Status: INACTIVE → ACTIVE
+# Expected:
+# - Category status → ACTIVE
+# - Message sent
+# - Email sent
+# - Products NOT auto-activated (only cascade for INACTIVE)
+PUT {{baseUrl}}/categories/5
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Category Status Test",
+  "status": "ACTIVE"
+}
+
+### 8.2. Delete Category (Có products) - Should fail
+DELETE {{baseUrl}}/categories/5
+Authorization: Bearer {{token}}
+
+# Expected: 409 Conflict
+# "Không thể xóa danh mục vì có sản phẩm đang tham chiếu"
+
+
+### ===========================================
+### 9. MONITOR ENDPOINTS
+### ===========================================
+
+### 9.1. Health Check
+GET http://localhost:8081/actuator/health
+Content-Type: application/json
+
+### 9.2. RabbitMQ Management UI
+# Open in browser: http://localhost:15672
+# Username: admin
+# Password: admin123
+
+
+### ===========================================
+### 10. CLEANUP
+### ===========================================
+
+### 10.1. Delete Test Products
+DELETE {{baseUrl}}/products/100
+Authorization: Bearer {{token}}
+
+### 10.2. Delete Test Category (After removing products)
+DELETE {{baseUrl}}/categories/5
+Authorization: Bearer {{token}}
+
+
+### ===========================================
+### NOTES
+### ===========================================
+
+# Redis CLI Commands:
+# docker exec -it wedmini-redis redis-cli
+# > KEYS *                    # List all keys
+# > KEYS products::*          # List product cache keys
+# > GET "products::1"         # Get value of key
+# > FLUSHALL                  # Clear all cache
+# > PING                      # Test connection
+
+# RabbitMQ:
+# UI: http://localhost:15672
+# Queue: category.queue
+# Exchange: category.exchange
+
+# Backend Log:
+# Check console for:
+# 📤 Đã gửi message
+# 📥 Nhận message
+# ✅ Đã gửi email
+# 🔄 Xử lý event

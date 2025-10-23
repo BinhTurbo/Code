@@ -29,6 +29,21 @@ services:
       timeout: 5s
       retries: 20
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: wedmini-rabbitmq
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   adminer:
     image: adminer
     container_name: minipos-adminer

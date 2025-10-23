@@ -27,24 +27,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // Enable CORS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers("/api/auth/**").permitAll()
+
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error").permitAll()
 
-                        // GET for ADMIN or USER
                         .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/products/**")
                         .hasAnyRole("ADMIN", "USER")
-
-                        // POST/PUT/DELETE for ADMIN only
                         .requestMatchers(HttpMethod.POST, "/api/categories/**", "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT,  "/api/categories/**", "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE,"/api/categories/**", "/api/products/**").hasRole("ADMIN")
-
-                        // anything else must be authenticated
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
@@ -55,27 +51,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Allow your frontend origin
         configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:4200"    // Angular default
+            "http://localhost:4200"
         ));
-        
-        // Allow all HTTP methods
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        
-        // Allow all headers
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        
-        // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);
-        
-        // Expose Authorization header to frontend
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
-        
-        // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
