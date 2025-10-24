@@ -12,26 +12,26 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
 public class CategoryController {
-    private final CategoryService service;
+    private final CategoryService serviceCategory;
 
     @PostMapping
     public CategoryDtos.CategoryResponse create(@Valid @RequestBody CategoryDtos.CategoryCreateRequest req) {
-        return service.create(req);
+        return serviceCategory.create(req);
     }
 
     @GetMapping("/{id}")
     public CategoryDtos.CategoryResponse get(@PathVariable Long id) {
-        return service.get(id);
+        return serviceCategory.get(id);
     }
 
     @PutMapping("/{id}")
     public CategoryDtos.CategoryResponse update(@PathVariable Long id, @Valid @RequestBody CategoryDtos.CategoryUpdateRequest req) {
-        return service.update(id, req);
+        return serviceCategory.update(id, req);
     }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
-        service.delete(id);
+        serviceCategory.delete(id);
     }
 
     @GetMapping
@@ -43,7 +43,7 @@ public class CategoryController {
             @RequestParam(required = false) String sort
     ) {
         Pageable pageable = toPageable(page, size, sort, "createdAt,desc");
-        return service.search(q, status, pageable);
+        return serviceCategory.search(q, status, pageable);
     }
 
     private Pageable toPageable(int page, int size, String sort, String fallback) {

@@ -15,11 +15,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 
-/**
- * Cấu hình Redis Cache
- * - Cache sẽ tự động lưu dữ liệu vào Redis
- * - Sử dụng annotation @Cacheable, @CacheEvict để quản lý cache
- */
+
 @Configuration
 @EnableCaching
 public class RedisConfig {

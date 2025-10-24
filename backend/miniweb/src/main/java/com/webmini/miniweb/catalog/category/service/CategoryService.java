@@ -23,7 +23,7 @@ public class CategoryService {
     private final CategoryEventPublisher eventPublisher;
 
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
+    // @CacheEvict(value = "categories", allEntries = true)
     public CategoryDtos.CategoryResponse create(CategoryDtos.CategoryCreateRequest req) {
         // Validate and trim name
         String trimmedName = validateAndTrimName(req.name());
@@ -50,7 +50,7 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "categories", key = "#id")
+    @Cacheable(value = "categories", key = "#id", unless = "#result == null")
     public CategoryDtos.CategoryResponse get(Long id) {
         Category e = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
@@ -58,7 +58,8 @@ public class CategoryService {
     }
 
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
+    // @CacheEvict(value = "categories", allEntries = true)
+    @CacheEvict(value = "categories", key = "#id")
     public CategoryDtos.CategoryResponse update(Long id, CategoryDtos.CategoryUpdateRequest req) {
         // Find existing category
         Category e = repo.findById(id)
@@ -101,7 +102,8 @@ public class CategoryService {
     }
 
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
+    @CacheEvict(value = "categories", key = "#id")
+    // @CacheEvict(value = "categories", allEntries = true)
     public void delete(Long id) {
         if (!repo.existsById(id)) {
             throw new NotFoundException("Không tìm thấy danh mục với ID: " + id);
