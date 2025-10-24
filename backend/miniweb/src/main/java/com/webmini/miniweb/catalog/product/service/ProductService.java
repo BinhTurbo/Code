@@ -7,21 +7,28 @@ import com.webmini.miniweb.catalog.product.entity.Product;
 import com.webmini.miniweb.catalog.product.mapper.ProductMapper;
 import com.webmini.miniweb.catalog.product.repo.ProductRepository;
 import com.webmini.miniweb.common.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository repo;
     private final CategoryRepository categories;
     private final ProductMapper mapper;
+    private final ObjectMapper objectMapper;
+    private final CacheManager cacheManager;
 
     @Transactional
     @CacheEvict(value = "products", allEntries = true)
@@ -68,12 +75,85 @@ public class ProductService {
         return mapper.toDto(saved);
     }
 
+    /**
+     * ✅ TỰ XỬ LÝ CACHE - Không dùng @Cacheable
+     * 
+     * 🔥 Flow:
+     * 1. Kiểm tra cache thủ công
+     * 2. Nếu có cache:
+     *    - Try cast về ProductResponse
+     *    - Nếu lỗi → convert từ LinkedHashMap
+     * 3. Nếu không có cache → query DB → cache lại
+     */
     @Transactional(readOnly = true)
-    @Cacheable(value = "products", key = "#id")
+    // ❌ BỎ @Cacheable (vì nó cast trước khi vào method)
+    // @Cacheable(value = "products", key = "#id")
     public ProductDtos.ProductResponse get(Long id) {
-        Product e = repo.findById(id)
+        log.debug("🔍 [CACHE] Đang tìm product ID={} trong cache...", id);
+        
+        // 1️⃣ Kiểm tra cache thủ công
+        Cache cache = cacheManager.getCache("products");
+        if (cache != null) {
+            Cache.ValueWrapper wrapper = cache.get(id);
+            
+            if (wrapper != null) {
+                Object cachedValue = wrapper.get();
+                log.debug("✅ [CACHE HIT] Tìm thấy cache cho product ID={}, kiểu: {}", id, 
+                         cachedValue != null ? cachedValue.getClass().getSimpleName() : "null");
+                
+                // 2️⃣ Xử lý cache data
+                try {
+                    // Try cast trực tiếp (nếu cache đúng)
+                    if (cachedValue instanceof ProductDtos.ProductResponse) {
+                        log.info("✅ [CACHE] Trả về cache đúng kiểu cho product ID={}", id);
+                        return (ProductDtos.ProductResponse) cachedValue;
+                    }
+                    
+                    // Nếu là LinkedHashMap → convert
+                    if (cachedValue instanceof LinkedHashMap) {
+                        log.warn("⚠️ [CACHE] Cache là LinkedHashMap, đang convert cho product ID={}...", id);
+                        ProductDtos.ProductResponse converted = objectMapper.convertValue(
+                            cachedValue, 
+                            ProductDtos.ProductResponse.class
+                        );
+                        log.info("✅ [CACHE] Convert thành công LinkedHashMap → ProductResponse cho ID={}", id);
+                        
+                        // 3️⃣ Cache lại đúng kiểu (để lần sau không cần convert)
+                        cache.put(id, converted);
+                        log.debug("💾 [CACHE] Đã cache lại đúng kiểu cho product ID={}", id);
+                        
+                        return converted;
+                    }
+                    
+                    // Kiểu không mong đợi → xóa cache lỗi
+                    log.error("❌ [CACHE] Cache có kiểu lạ: {} cho product ID={}, xóa cache...", 
+                             cachedValue.getClass().getName(), id);
+                    cache.evict(id);
+                    
+                } catch (Exception ex) {
+                    log.error("❌ [CACHE] Lỗi khi xử lý cache cho product ID={}: {}", id, ex.getMessage());
+                    // Xóa cache lỗi
+                    cache.evict(id);
+                }
+            } else {
+                log.debug("❌ [CACHE MISS] Không tìm thấy cache cho product ID={}", id);
+            }
+        }
+        
+        // 4️⃣ Cache miss hoặc lỗi → Query DB
+        log.info("🔄 [DB QUERY] Query database cho product ID={}", id);
+        Product entity = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy sản phẩm với ID: " + id));
-        return mapper.toDto(e);
+        
+        ProductDtos.ProductResponse response = mapper.toDto(entity);
+        
+        // 5️⃣ Cache lại kết quả
+        if (cache != null) {
+            cache.put(id, response);
+            log.debug("💾 [CACHE] Đã cache response cho product ID={}", id);
+        }
+        
+        return response;
     }
 
     @Transactional

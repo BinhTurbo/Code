@@ -127,6 +127,27 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<Product> findByCategoryIdAndStatus(Long categoryId, Product.ProductStatus status) {
+        String sql = """
+            SELECT p.id, p.sku, p.name, p.price, p.stock, p.status, p.created_at, p.updated_at,
+                   c.id as cat_id, c.name as cat_name, c.status as cat_status, c.created_at as cat_created, c.updated_at as cat_updated
+            FROM products p
+            INNER JOIN categories c ON p.category_id = c.id
+            WHERE p.category_id = ?
+            AND p.status = ?
+            ORDER BY p.id
+        """;
+        
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+            .setParameter(1, categoryId)
+            .setParameter(2, status.name()) // Convert enum to String
+            .getResultList();
+        
+        return rows.stream().map(this::mapToProduct).toList();
+    }
+
+    @Override
     public Page<Product> findAllWithCategory(Pageable pageable) {
         // Count total
         String countSql = "SELECT COUNT(*) FROM products";

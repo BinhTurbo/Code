@@ -19,4 +19,6 @@ public interface ProductRepository {
     Page<Product> search(String q, String sku, Long categoryId, String status, Integer minStockLt, Pageable pageable);
     List<Product> findAll();
     void saveAll(List<Product> products);
+    
+    List<Product> findByCategoryIdAndStatus(Long categoryId, Product.ProductStatus status);
 }

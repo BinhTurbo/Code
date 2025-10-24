@@ -125,7 +125,7 @@ public class CategoryRepositoryImpl implements CategoryRepository {
 
     @Override
     public Page<Category> search(String q, String status, Pageable pageable) {
-        // Build WHERE clause
+
         StringBuilder whereClause = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
         int paramIndex = 1;
@@ -141,8 +141,8 @@ public class CategoryRepositoryImpl implements CategoryRepository {
             params.add(status);
             paramIndex++;
         }
-        
-        // Count total
+
+        // Return
         String countSql = "SELECT COUNT(*) FROM categories" + whereClause;
         var countQuery = em.createNativeQuery(countSql);
         for (int i = 0; i < params.size(); i++) {
