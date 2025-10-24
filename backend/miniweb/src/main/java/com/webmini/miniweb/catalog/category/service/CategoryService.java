@@ -53,71 +53,48 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public CategoryDtos.CategoryResponse get(Long id) {
-        log.debug("🔍 [CACHE] Đang tìm category ID={} trong cache...", id);
-        
+
         Cache cache = cacheManager.getCache("categories");
         if (cache != null) {
             Cache.ValueWrapper wrapper = cache.get(id);
             
             if (wrapper != null) {
                 Object cachedValue = wrapper.get();
-                log.debug("✅ [CACHE HIT] Tìm thấy cache cho ID={}, kiểu: {}", id, cachedValue != null ? cachedValue.getClass().getSimpleName() : "null");
-
                 try {
                     if (cachedValue instanceof CategoryDtos.CategoryResponse) {
-                        log.info("✅ [CACHE] Trả về cache đúng kiểu cho ID={}", id);
                         return (CategoryDtos.CategoryResponse) cachedValue;
                     }
                     
                     if (cachedValue instanceof LinkedHashMap) {
-                        log.warn("⚠️ [CACHE] Cache là LinkedHashMap, đang convert cho ID={}...", id);
                         CategoryDtos.CategoryResponse converted = objectMapper.convertValue(
                             cachedValue, 
                             CategoryDtos.CategoryResponse.class
                         );
-                        log.info("✅ [CACHE] Convert thành công LinkedHashMap → CategoryResponse cho ID={}", id);
-                        
                         cache.put(id, converted);
-                        log.debug("💾 [CACHE] Đã cache lại đúng kiểu cho ID={}", id);
-                        
                         return converted;
                     }
-                    
-                    log.error("❌ [CACHE] Cache có kiểu lạ: {} cho ID={}, xóa cache...", 
-                             cachedValue.getClass().getName(), id);
                     cache.evict(id);
-                    
                 } catch (Exception ex) {
-                    log.error("❌ [CACHE] Lỗi khi xử lý cache cho ID={}: {}", id, ex.getMessage());
                     cache.evict(id);
                 }
-            } else {
-                log.debug("❌ [CACHE MISS] Không tìm thấy cache cho ID={}", id);
             }
         }
         
-        log.info("🔄 [DB QUERY] Query database cho category ID={}", id);
-        Category entity = repo.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
+        Category entity = repo.findById(id).orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
         
         CategoryDtos.CategoryResponse response = mapper.toDto(entity);
         
         if (cache != null) {
             cache.put(id, response);
-            log.debug("💾 [CACHE] Đã cache response cho ID={}", id);
         }
         
         return response;
     }
 
-    /**
-     * ✅ CẢI TIẾN: Cascade inactive products khi category bị inactive
-     */
+
     @Transactional
-    @CacheEvict(value = "categories", key = "#id")
     public CategoryDtos.CategoryResponse update(Long id, CategoryDtos.CategoryUpdateRequest req) {
-        Category e = repo.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
+        Category e = repo.findById(id).orElseThrow(() -> new NotFoundException("Không tìm thấy danh mục với ID: " + id));
         
         String trimmedName = validateAndTrimName(req.name());
         validateStatus(req.status());
@@ -135,11 +112,8 @@ public class CategoryService {
         
         Category saved = repo.save(e);
 
-        // 🔥 XỬ LÝ CASCADE: ACTIVE → INACTIVE
-        if (oldStatus == Category.CategoryStatus.ACTIVE && 
+        if (oldStatus == Category.CategoryStatus.ACTIVE &&
             newStatus == Category.CategoryStatus.INACTIVE) {
-            
-            log.info("⚠️ [CASCADE] Category ID={} chuyển ACTIVE → INACTIVE, đang inactive các products...", id);
             cascadeInactiveProducts(saved);
         }
 
@@ -157,7 +131,6 @@ public class CategoryService {
     }
 
     @Transactional
-    @CacheEvict(value = "categories", key = "#id")
     public void delete(Long id) {
         if (!repo.existsById(id)) {
             throw new NotFoundException("Không tìm thấy danh mục với ID: " + id);
@@ -182,31 +155,17 @@ public class CategoryService {
         return repo.search(q, status, pageable).map(mapper::toDto);
     }
 
-    /**
-     * 🔥 CASCADE: Tự động inactive tất cả products thuộc category
-     *
-     * ⚠️ Logic:
-     * - Tìm tất cả products ACTIVE thuộc category
-     * - Chuyển status sang INACTIVE
-     * - Xóa cache của products bị ảnh hưởng
-     * - Log số lượng products bị inactive
-     */
+
     private void cascadeInactiveProducts(Category category) {
-        // Tìm tất cả products ACTIVE thuộc category này
         List<Product> activeProducts = productRepo.findByCategoryIdAndStatus(
             category.getId(), 
             Product.ProductStatus.ACTIVE
         );
         
         if (activeProducts.isEmpty()) {
-            log.info("✅ [CASCADE] Không có products ACTIVE nào thuộc category ID={}", category.getId());
             return;
         }
         
-        log.warn("⚠️ [CASCADE] Tìm thấy {} products ACTIVE thuộc category ID={}, đang inactive...", 
-                 activeProducts.size(), category.getId());
-        
-        // Inactive từng product
         int count = 0;
         Cache productCache = cacheManager.getCache("products");
         
@@ -215,18 +174,12 @@ public class CategoryService {
             product.setUpdatedAt(java.time.LocalDateTime.now());
             productRepo.save(product);
             
-            // Xóa cache của product
             if (productCache != null) {
                 productCache.evict(product.getId());
-                log.debug("🗑️ [CACHE] Đã xóa cache cho product ID={}", product.getId());
             }
             
             count++;
-            log.debug("✅ [CASCADE] Inactive product ID={} (SKU: {})", product.getId(), product.getSku());
         }
-        
-        log.warn("⚠️ [CASCADE] Đã inactive {} products thuộc category ID={} ({})", 
-                 count, category.getId(), category.getName());
     }
 
     private String validateAndTrimName(String name) {

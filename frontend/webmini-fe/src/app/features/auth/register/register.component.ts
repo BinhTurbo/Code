@@ -11,62 +11,43 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { ToastService } from '../../../core/toast.service';
 
-function matchPasswordValidator(
-  group: AbstractControl
-): ValidationErrors | null {
+function matchPasswordValidator(group: AbstractControl): ValidationErrors | null {
   const pw = group.get('password')?.value;
   const cf = group.get('confirmPassword')?.value;
   return pw && cf && pw !== cf ? { mismatch: true } : null;
 }
 
-// Validator cho username: chỉ cho phép chữ cái, số, gạch dưới và gạch ngang
 function usernameValidator(control: AbstractControl): ValidationErrors | null {
   if (!control.value) return null;
   const usernameRegex = /^[a-zA-Z0-9_-]+$/;
   return usernameRegex.test(control.value) ? null : { invalidUsername: true };
 }
 
-// Validator cho độ mạnh của password
-function passwordStrengthValidator(
-  control: AbstractControl
-): ValidationErrors | null {
+function passwordStrengthValidator(control: AbstractControl): ValidationErrors | null {
   if (!control.value) return null;
   const password = control.value;
-
-  // Kiểm tra có ít nhất 1 chữ hoa
   if (!/[A-Z]/.test(password)) {
     return { noUpperCase: true };
   }
-
-  // Kiểm tra có ít nhất 1 chữ thường
   if (!/[a-z]/.test(password)) {
     return { noLowerCase: true };
   }
-
-  // Kiểm tra có ít nhất 1 số
   if (!/[0-9]/.test(password)) {
     return { noNumber: true };
   }
-
   return null;
 }
 
-// Validator cho tên đầy đủ
 function fullNameValidator(control: AbstractControl): ValidationErrors | null {
   if (!control.value) return null;
   const trimmed = control.value.trim();
-
-  // Kiểm tra có ít nhất 2 từ (họ và tên)
   if (trimmed.split(/\s+/).length < 2) {
     return { invalidFullName: true };
   }
-
-  // Kiểm tra chỉ chứa chữ cái, dấu cách và các ký tự tiếng Việt
   const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/;
   if (!nameRegex.test(trimmed)) {
     return { invalidCharacters: true };
   }
-
   return null;
 }
 
@@ -86,12 +67,10 @@ export class RegisterComponent {
   error = signal<string | null>(null);
 
   form = this.fb.group({
-    // full_name VARCHAR(150)
     fullName: [
       '',
       [Validators.required, Validators.maxLength(150), fullNameValidator],
     ],
-    // username VARCHAR(100)
     username: [
       '',
       [
@@ -103,13 +82,12 @@ export class RegisterComponent {
     ],
     pw: this.fb.group(
       {
-        // password_hash VARCHAR(255) - nhưng input giới hạn 72 ký tự (bcrypt limit)
         password: [
           '',
           [
             Validators.required,
             Validators.minLength(8),
-            Validators.maxLength(72), // bcrypt chỉ xử lý tối đa 72 bytes
+            Validators.maxLength(72),
             passwordStrengthValidator,
           ],
         ],
@@ -120,36 +98,26 @@ export class RegisterComponent {
   });
 
   onSubmit() {
-    // Trim whitespace từ các trường
     const fullNameControl = this.form.get('fullName');
     const usernameControl = this.form.get('username');
-
     if (fullNameControl?.value) {
       fullNameControl.setValue(fullNameControl.value.trim());
     }
-
     if (usernameControl?.value) {
       usernameControl.setValue(usernameControl.value.trim());
     }
-
-    // Đánh dấu tất cả các trường là touched để hiển thị lỗi
     this.form.markAllAsTouched();
-
     if (this.form.invalid) {
       return;
     }
-
     this.loading.set(true);
     this.error.set(null);
-
     const fullName = this.form.value.fullName!;
     const username = this.form.value.username!;
     const password = (this.form.value.pw as any).password as string;
-
     this.auth.register({ fullName, username, password }).subscribe({
       next: (res) => {
         this.toast.success('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
-        // Chuyển về trang đăng nhập
         this.router.navigateByUrl('/login');
       },
       error: (err) => {
@@ -164,15 +132,12 @@ export class RegisterComponent {
   getPasswordStrength(): string {
     const password = this.form.get('pw.password')?.value;
     if (!password) return '';
-
     let strength = 0;
-
     if (password.length >= 8) strength++;
     if (/[a-z]/.test(password)) strength++;
     if (/[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^a-zA-Z0-9]/.test(password)) strength++;
-
     if (strength <= 2) return 'weak';
     if (strength <= 4) return 'medium';
     return 'strong';

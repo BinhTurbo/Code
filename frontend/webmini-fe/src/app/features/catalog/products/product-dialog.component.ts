@@ -35,46 +35,39 @@ import { ToastService } from '../../../core/toast.service';
   templateUrl: './product-dialog.component.html',
   styleUrls: ['./product-dialog.component.scss'],
 })
+
 export class ProductDialog implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogService);
   private readonly toast = inject(ToastService);
   readonly ref = inject(MatDialogRef<ProductDialog>);
   readonly data = inject<Product | null>(MAT_DIALOG_DATA);
-
-  // Validation theo DB schema
   form = this.fb.group({
-    // sku VARCHAR(100) NOT NULL UNIQUE
     sku: [
       this.data?.sku || '',
       [Validators.required, Validators.minLength(3), Validators.maxLength(100)],
     ],
-    // name VARCHAR(200) NOT NULL
     name: [
       this.data?.name || '',
       [Validators.required, Validators.minLength(2), Validators.maxLength(200)],
     ],
-    // category_id BIGINT NOT NULL
     categoryId: [this.data?.categoryId || null, Validators.required],
-    // price DECIMAL(18,2) NOT NULL DEFAULT 0, CHECK (price >= 0)
     price: [
       this.data?.price ?? 0,
       [
         Validators.required,
         Validators.min(0),
-        Validators.max(999999999999.99), // Safe number for DECIMAL(18,2)
+        Validators.max(999999999999.99),
       ],
     ],
-    // stock INT NOT NULL DEFAULT 0, CHECK (stock >= 0)
     stock: [
       this.data?.stock ?? 0,
       [
         Validators.required,
         Validators.min(0),
-        Validators.max(2147483647), // INT max
+        Validators.max(2147483647),
       ],
     ],
-    // status ENUM('ACTIVE','INACTIVE')
     status: [this.data?.status || 'ACTIVE', Validators.required],
   });
 
@@ -96,7 +89,7 @@ export class ProductDialog implements OnInit {
         distinctUntilChanged(),
         switchMap((q) => {
           this.loadingCats.set(true);
-          return this.api.listCategories(q || '', 'ACTIVE', 0, 20, 'name,asc');
+          return this.api.listCategories(q || '', 'ACTIVE', 0, 5, 'name,asc');
         })
       )
       .subscribe((res) => {
@@ -108,13 +101,14 @@ export class ProductDialog implements OnInit {
   private queryCategories(q: string | null) {
     this.loadingCats.set(true);
     this.api
-      .listCategories(q || '', 'ACTIVE', 0, 20, 'name,asc')
+      .listCategories(q || '', 'ACTIVE', 0, 5, 'name,asc')
       .subscribe((res) => {
         this.categories.set(res.content);
         this.loadingCats.set(false);
       });
   }
 
+  // Chọn category
   onCategorySelected(cat: Category) {
     this.form.patchValue({ categoryId: cat.id });
     this.selectedCategoryName.set(cat.name);
@@ -122,23 +116,16 @@ export class ProductDialog implements OnInit {
   }
 
   onSubmit() {
-    // Trim whitespace
     const skuControl = this.form.get('sku');
     const nameControl = this.form.get('name');
-
     if (skuControl?.value && !this.data) {
       skuControl.setValue(skuControl.value.trim());
     }
-
     if (nameControl?.value) {
       nameControl.setValue(nameControl.value.trim());
     }
-
-    // Mark all as touched để hiển thị lỗi
     this.form.markAllAsTouched();
-
     if (this.form.invalid) return;
-
     const value = this.form.value as Partial<Product>;
     const req = this.data
       ? this.api.updateProduct(this.data.id, value)

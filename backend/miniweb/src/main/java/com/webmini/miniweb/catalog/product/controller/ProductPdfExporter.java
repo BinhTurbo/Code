@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -22,8 +23,7 @@ public class ProductPdfExporter {
     private final ProductRepository repo;
 
     public void exportAll(OutputStream os) throws Exception {
-        // 1) Gom data (đọc theo trang)
-        java.util.List<ProductRow> rows = new java.util.ArrayList<>();
+        List<ProductRow> rows = new ArrayList<>();
         int page = 0, size = 1000;
         Page<Product> slice;
         do {
@@ -34,27 +34,22 @@ public class ProductPdfExporter {
             page++;
         } while (!slice.isLast());
 
-        // 2) Nạp & compile jrxml
         try (InputStream in = new ClassPathResource("reports/products_report.jrxml").getInputStream()) {
             JasperReport rpt = JasperCompileManager.compileReport(in);
 
-            // 3) Tham số (logo, tiêu đề, ngày …)
             Map<String, Object> params = new HashMap<>();
             params.put("REPORT_TITLE", "Product List");
-            params.put("REPORT_DATE", java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-            // Logo (tuỳ chọn): đặt ở resources/static/logo.png
+            params.put("REPORT_DATE", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
             try {
                 params.put("LOGO", new ClassPathResource("static/logo.png").getInputStream());
             } catch (Exception ignore) { params.put("LOGO", null); }
 
-            // 4) Fill & export
             JRBeanCollectionDataSource ds = new JRBeanCollectionDataSource(rows);
             JasperPrint print = JasperFillManager.fillReport(rpt, params, ds);
             JasperExportManager.exportReportToPdfStream(print, os);
         }
     }
 
-    /** Row DTO gọn cho Jasper */
     public static class ProductRow {
         private Long id;
         private String sku;
@@ -78,7 +73,6 @@ public class ProductPdfExporter {
             return r;
         }
 
-        // getters cho Jasper
         public Long getId() { return id; }
         public String getSku() { return sku; }
         public String getName() { return name; }

@@ -67,7 +67,6 @@ public class RoleRepositoryImpl implements RoleRepository {
                 .setParameter(2, role.getName())
                 .executeUpdate();
             
-            // Get generated ID
             Long id = ((Number) em.createNativeQuery("SELECT LAST_INSERT_ID()").getSingleResult()).longValue();
             role.setId(id);
             return role;

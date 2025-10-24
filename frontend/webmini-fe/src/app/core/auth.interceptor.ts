@@ -20,18 +20,15 @@ export const authInterceptor: HttpInterceptorFn = (
 
   const access = tokens.access();
 
-  // Identify auth endpoints to avoid recursive refresh and unnecessary headers
   const isAuthUrl = req.url.includes('/auth/');
   const isRefreshCall = req.url.includes('/auth/refresh');
 
-  // Only attach access token to non-auth endpoints
   if (access && !isAuthUrl) {
     req = req.clone({ setHeaders: { Authorization: `Bearer ${access}` } });
   }
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Only attempt refresh for 401/403 on non-auth endpoints, and never for the refresh call itself
       if (
         (error.status === 401 || error.status === 403) &&
         !isAuthUrl &&
@@ -52,7 +49,6 @@ export const authInterceptor: HttpInterceptorFn = (
             return next(retry);
           }),
           catchError(() => {
-            // refresh failed -> logout (avoid any loop)
             auth.logout();
             return throwError(() => error);
           })

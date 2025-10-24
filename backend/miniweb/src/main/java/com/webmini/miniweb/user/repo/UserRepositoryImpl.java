@@ -20,7 +20,6 @@ public class UserRepositoryImpl implements UserRepository {
     @Transactional
     public User save(User user) {
         if (user.getId() == null) {
-            // Insert
             String sql = """
                 INSERT INTO users (username, password_hash, full_name, role_id, status, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -34,12 +33,10 @@ public class UserRepositoryImpl implements UserRepository {
                 .setParameter(6, user.getCreatedAt())
                 .executeUpdate();
             
-            // Get generated ID
             Long id = ((Number) em.createNativeQuery("SELECT LAST_INSERT_ID()").getSingleResult()).longValue();
             user.setId(id);
             return user;
         } else {
-            // Update
             String sql = """
                 UPDATE users
                 SET username = ?, password_hash = ?, full_name = ?, role_id = ?, status = ?
@@ -134,7 +131,6 @@ public class UserRepositoryImpl implements UserRepository {
         user.setFullName((String) row[3]);
         user.setStatus(User.Status.valueOf((String) row[4]));
         
-        // Convert java.sql.Timestamp to LocalDateTime
         if (row[5] != null) {
             user.setCreatedAt(((java.sql.Timestamp) row[5]).toLocalDateTime());
         }

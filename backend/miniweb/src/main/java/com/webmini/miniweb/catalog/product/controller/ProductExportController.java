@@ -45,7 +45,7 @@ public class ProductExportController {
             resp.setContentType(MediaType.APPLICATION_PDF_VALUE);
             resp.setHeader("Content-Disposition", contentDisposition(filename));
             try (OutputStream os = resp.getOutputStream()) {
-                pdfExporter.exportAll(os); // tự xử lý phân trang & render
+                pdfExporter.exportAll(os);
             }
             return;
         }
@@ -59,12 +59,9 @@ public class ProductExportController {
         return "attachment; filename*=UTF-8''" + enc;
     }
 
-    /** CSV streaming: đọc theo trang để tránh OOM */
     private void exportCsvStreaming(HttpServletResponse resp) throws Exception {
-        // BOM để Excel mở UTF-8 không lỗi dấu (tuỳ chọn)
         resp.getOutputStream().write(new byte[]{(byte)0xEF,(byte)0xBB,(byte)0xBF});
 
-        // header
         String header = String.join(",",
                 "ID","SKU","Name","Category","Price","Stock","Status","CreatedAt","UpdatedAt") + "\n";
         resp.getOutputStream().write(header.getBytes(StandardCharsets.UTF_8));
@@ -85,7 +82,7 @@ public class ProductExportController {
                         csv(p.getUpdatedAt()) + "\n";
                 resp.getOutputStream().write(line.getBytes(StandardCharsets.UTF_8));
             }
-            resp.flushBuffer(); // đẩy ra client theo dòng
+            resp.flushBuffer();
             page++;
         } while (!slice.isLast());
     }

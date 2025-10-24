@@ -13,12 +13,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Consumer (Listener) lắng nghe message từ RabbitMQ
- * Khi có message mới, sẽ tự động xử lý:
- * - Gửi email
- * - Cập nhật status của product (nếu cần)
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

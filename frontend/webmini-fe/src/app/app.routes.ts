@@ -33,11 +33,27 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'categories/:id',
+    canActivate: [canActivateAuth],
+    loadComponent: () =>
+      import('./features/catalog/categories/category-detail.component').then(
+        (m) => m.CategoryDetailComponent
+      ),
+  },
+  {
     path: 'products',
     canActivate: [canActivateAuth],
     loadComponent: () =>
       import('./features/catalog/products/products.component').then(
         (m) => m.ProductsComponent
+      ),
+  },
+  {
+    path: 'products/:id',
+    canActivate: [canActivateAuth],
+    loadComponent: () =>
+      import('./features/catalog/products/product-detail.component').then(
+        (m) => m.ProductDetailComponent
       ),
   },
   { path: '**', redirectTo: '' },

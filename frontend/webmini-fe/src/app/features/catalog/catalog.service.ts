@@ -9,7 +9,6 @@ export class CatalogService {
   private http = inject(HttpClient);
   private base = environment.apiUrl;
 
-  // ---- Categories ----
   listCategories(
     q = '',
     status = '',
@@ -36,8 +35,14 @@ export class CatalogService {
   deleteCategory(id: number) {
     return this.http.delete<void>(`${this.base}/categories/${id}`);
   }
+  getCategory(id: number): Observable<Category> {
+    return this.http.get<Category>(`${this.base}/categories/${id}`);
+  }
 
-  // ---- Products ----
+
+
+
+
   listProducts(
     filter: any = {},
     page = 0,
@@ -64,5 +69,8 @@ export class CatalogService {
   }
   deleteProduct(id: number) {
     return this.http.delete<void>(`${this.base}/products/${id}`);
+  }
+  getProduct(id: number): Observable<Product> {
+    return this.http.get<Product>(`${this.base}/products/${id}`);
   }
 }

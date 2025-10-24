@@ -149,11 +149,9 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Page<Product> findAllWithCategory(Pageable pageable) {
-        // Count total
         String countSql = "SELECT COUNT(*) FROM products";
         Long total = ((Number) em.createNativeQuery(countSql).getSingleResult()).longValue();
         
-        // Get data with pagination
         String dataSql = """
             SELECT p.id, p.sku, p.name, p.price, p.stock, p.status, p.created_at, p.updated_at,
                    c.id as cat_id, c.name as cat_name, c.status as cat_status, c.created_at as cat_created, c.updated_at as cat_updated
@@ -194,7 +192,6 @@ public class ProductRepositoryImpl implements ProductRepository {
 
     @Override
     public Page<Product> search(String q, String sku, Long categoryId, String status, Integer minStockLt, Pageable pageable) {
-        // Build WHERE clause
         StringBuilder whereClause = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
         int paramIndex = 1;
@@ -229,7 +226,6 @@ public class ProductRepositoryImpl implements ProductRepository {
             paramIndex++;
         }
         
-        // Count total
         String countSql = "SELECT COUNT(*) FROM products p" + whereClause;
         var countQuery = em.createNativeQuery(countSql);
         for (int i = 0; i < params.size(); i++) {
@@ -237,7 +233,6 @@ public class ProductRepositoryImpl implements ProductRepository {
         }
         Long total = ((Number) countQuery.getSingleResult()).longValue();
         
-        // Get data with pagination
         String dataSql = """
             SELECT p.id, p.sku, p.name, p.price, p.stock, p.status, p.created_at, p.updated_at,
                    c.id as cat_id, c.name as cat_name, c.status as cat_status, c.created_at as cat_created, c.updated_at as cat_updated
@@ -351,7 +346,6 @@ public class ProductRepositoryImpl implements ProductRepository {
         product.setStock((Integer) row[4]);
         product.setStatus(Product.ProductStatus.valueOf((String) row[5]));
         
-        // Convert java.sql.Timestamp to LocalDateTime
         if (row[6] != null) {
             product.setCreatedAt(((java.sql.Timestamp) row[6]).toLocalDateTime());
         }
@@ -364,7 +358,6 @@ public class ProductRepositoryImpl implements ProductRepository {
         category.setName((String) row[9]);
         category.setStatus(Category.CategoryStatus.valueOf((String) row[10]));
         
-        // Convert category timestamps
         if (row[11] != null) {
             category.setCreatedAt(((java.sql.Timestamp) row[11]).toLocalDateTime());
         }

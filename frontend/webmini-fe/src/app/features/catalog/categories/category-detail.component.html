@@ -1,0 +1,55 @@
+<div class="detail-container">
+  @if (loading()) {
+    <div class="loading">
+      <mat-spinner></mat-spinner>
+    </div>
+  } @else if (category()) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Chi tiết danh mục</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="detail-row">
+          <span class="label">ID:</span>
+          <span class="value">{{ category()!.id }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tên danh mục:</span>
+          <span class="value">{{ category()!.name }}</span>
+        </div>
+        <!-- XÓA dòng description vì Category không có field này -->
+        <div class="detail-row">
+          <span class="label">Trạng thái:</span>
+          <span class="value" [class.active]="category()!.status === 'ACTIVE'" 
+                [class.inactive]="category()!.status === 'INACTIVE'">
+            {{ category()!.status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng hoạt động' }}
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Ngày tạo:</span>
+          <span class="value">{{ category()!.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Cập nhật lần cuối:</span>
+          <span class="value">{{ category()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button (click)="goBack()">
+          Quay lại
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  } @else {
+    <mat-card>
+      <mat-card-content>
+        <p>Không tìm thấy danh mục.</p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button (click)="goBack()">
+          Quay lại
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+</div>

@@ -30,6 +30,7 @@ import type { ConfirmDialogData } from '../../../core/confirm-dialog/confirm-dia
   templateUrl: './products.component.html',
   styleUrls: ['./products.component.scss'],
 })
+
 export class ProductsComponent implements OnInit {
   private readonly api = inject(CatalogService);
   private readonly dialog = inject(MatDialog);
@@ -96,7 +97,6 @@ export class ProductsComponent implements OnInit {
 
   exportProducts(format: 'csv' | 'pdf') {
     const url = `http://localhost:8081/api/products/export?format=${format}`;
-    // Use HttpClient so that auth interceptor (if any) attaches tokens/cookies
     this.http.get(url, { responseType: 'blob' as 'json' }).subscribe({
       next: (data: any) => {
         const blob = data as Blob;

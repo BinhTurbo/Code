@@ -1,0 +1,57 @@
+.detail-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+mat-card {
+  margin-top: 20px;
+}
+
+mat-card-content {
+  padding: 20px;
+}
+
+.detail-row {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 600;
+  width: 200px;
+  color: #666;
+}
+
+.value {
+  flex: 1;
+  color: #333;
+}
+
+.value.active {
+  color: #4caf50;
+  font-weight: 500;
+}
+
+.value.inactive {
+  color: #f44336;
+  font-weight: 500;
+}
+
+mat-card-actions {
+  padding: 16px;
+  display: flex;
+  gap: 10px;
+}

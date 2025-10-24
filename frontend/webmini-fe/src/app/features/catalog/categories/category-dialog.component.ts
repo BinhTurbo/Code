@@ -22,6 +22,8 @@ import { ToastService } from '../../../core/toast.service';
   templateUrl: './category-dialog.component.html',
   styleUrls: ['./category-dialog.component.scss'],
 })
+
+
 export class CategoryDialog {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogService);
@@ -29,7 +31,6 @@ export class CategoryDialog {
   readonly ref = inject(MatDialogRef<CategoryDialog>);
   readonly data = inject<Category | null>(MAT_DIALOG_DATA);
 
-  // Validation theo DB: name VARCHAR(150) NOT NULL UNIQUE
   form = this.fb.group({
     name: [
       this.data?.name || '',
@@ -39,17 +40,12 @@ export class CategoryDialog {
   });
 
   onSubmit() {
-    // Trim whitespace
     const nameControl = this.form.get('name');
     if (nameControl?.value) {
       nameControl.setValue(nameControl.value.trim());
     }
-
-    // Mark all as touched để hiển thị lỗi
     this.form.markAllAsTouched();
-
     if (this.form.invalid) return;
-
     const value = this.form.value as Partial<Category>;
     const req = this.data
       ? this.api.updateCategory(this.data.id, value)
